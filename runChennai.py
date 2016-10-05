@@ -29,11 +29,11 @@ def run_chennai(sim_id):
     print "outputs_dir = " + outputs_dir
 
     # get data
-    print "downloading data..."
-    urllib.urlretrieve(
-        'http://chennaifloodmanagement.org/uploaded/layers/_30sdem_utm44.tif',
-        inputs_dir + '30sdem_utm44.tif'
-    )
+    # print "downloading data..."
+    # urllib.urlretrieve(
+    #     'http://chennaifloodmanagement.org/uploaded/layers/_30sdem_utm44.tif',
+    #     inputs_dir + '30sdem_utm44.tif'
+    # )
 
     print os.listdir(inputs_dir)
 
@@ -88,7 +88,7 @@ def run_chennai(sim_id):
     domain = anuga.create_domain_from_regions(bounding_polygon=bounding_polygon_01,
                                               boundary_tags=boundary_tags_01,
                                               mesh_filename=working_dir + 'mesh_01.msh',
-                                              maximum_triangle_area=100000,
+                                              maximum_triangle_area=30000,
                                               verbose=True)
     domain.set_name(sim_id)
     domain.set_datadir(outputs_dir)
@@ -137,30 +137,35 @@ def run_chennai(sim_id):
 
     print "# Evolve system through time"
     counter_timestep = 0
-    for t in domain.evolve(yieldstep=300, finaltime=15000):
+    for t in domain.evolve(yieldstep=300, finaltime=60000):
         counter_timestep += 1
         print counter_timestep
         print domain.timestepping_statistics()
 
-    anuga.sww2dem(sim_id + '_momentum.sww',
-                  sim_id + '_momentum.asc',
+    asc_out_momentum = outputs_dir + '/' + sim_id + '_momentum.asc'
+    asc_out_stage = outputs_dir + '/' + sim_id + '_stage.asc'
+
+    anuga.sww2dem(outputs_dir + '/' + sim_id + '.sww',
+                  asc_out_momentum,
                   quantity='momentum',
+                  number_of_decimal_places=3,
                   cellsize=30,
                   reduction=max,
                   verbose=True)
-    anuga.sww2dem(sim_id + '_depth.sww',
-                  sim_id + '_depth.asc',
+    anuga.sww2dem(outputs_dir + '/' + sim_id + '.sww',
+                  asc_out_stage,
                   quantity='depth',
+                  number_of_decimal_places=3,
                   cellsize=30,
                   reduction=max,
                   verbose=True)
 
-    outputs =[sim_id + '_momentum', sim_id + '_depth']
+    outputs =[asc_out_stage, asc_out_momentum]
 
     for output in outputs:
         print "# Convert ASCII grid to GeoTiff so geonode can import it"
-        src_ds = gdal.Open('%s/%s.asc' % (outputs_dir, output))
-        dst_filename = ('%s/%s.tif' % (outputs_dir, output))
+        src_ds = gdal.Open(output)
+        dst_filename = (output[:-3] + 'tif')
 
         print "# Create gtif instance"
         driver = gdal.GetDriverByName("GTiff")
