@@ -4,6 +4,8 @@ from osgeo import gdal, osr
 import anuga, os, sys, numpy, urllib
 import anuga.utilities.quantity_setting_functions as qs
 import anuga.utilities.log as log
+from anuga.shallow_water.forcing import Rainfall
+
 
 def run_chennai(sim_id):
     project_root = os.path.abspath(os.path.dirname(__file__))
@@ -82,11 +84,11 @@ def run_chennai(sim_id):
         ]
     boundary_tags_01 = {'inland': range(0, 15) + range(25, 31), 'ocean': range(15, 25)}
     print "# Create domain:"
-    print "! mesh_filename = " + working_dir + 'mesh_01.msh'
+    print "# mesh_filename = " + working_dir + 'mesh_01.msh'
     domain = anuga.create_domain_from_regions(bounding_polygon=bounding_polygon_01,
                                               boundary_tags=boundary_tags_01,
                                               mesh_filename=working_dir + 'mesh_01.msh',
-                                              maximum_triangle_area=30000,
+                                              maximum_triangle_area=100000,
                                               verbose=True)
     domain.set_name(sim_id)
     domain.set_datadir(outputs_dir)
@@ -114,42 +116,62 @@ def run_chennai(sim_id):
     print "# Setup boundary conditions"
     Br = anuga.Reflective_boundary(domain)  # Solid reflective wall
     Bt = anuga.Transmissive_boundary(domain)  # Continue all values on boundary
-    Bd = anuga.Dirichlet_boundary([-0.2, 0., 0.])  # Constant boundary values
+    Bd = anuga.Dirichlet_boundary([-20, 0., 0.])  # Constant boundary values
+    Bi = anuga.Dirichlet_boundary([10.0, 0, 0])  # Inflow
     Bw = anuga.Time_boundary(
         domain=domain,  # Time dependent boundary
         function=lambda t: [(10 * sin(t * 2 * pi) - 0.3) * exp(-t), 0.0, 0.0]
     )
 
     print "# Associate boundary tags with boundary objects"
-    domain.set_boundary({'inland': Br, 'ocean': Bw})
+    domain.set_boundary({'inland': Br, 'ocean': Bd})
+    print domain.get_boundary_tags()
+
+    catchmentrainfall = Rainfall(
+        domain=domain,
+        rate=0.2
+    )
+    # # Note need path to File in String.
+    # # Else assumed in same directory
+    domain.forcing_terms.append(catchmentrainfall)
 
     print "# Evolve system through time"
     counter_timestep = 0
-    for t in domain.evolve(yieldstep=10, finaltime=30.0):
+    for t in domain.evolve(yieldstep=300, finaltime=15000):
         counter_timestep += 1
         print counter_timestep
-        # Export results to ASCII grid
-        anuga.sww2dem(
-            '%s/%s.sww' % (outputs_dir, sim_id),  # input file
-            '%s/%s.asc' % (outputs_dir, sim_id),  # output file
-            quantity='stage',
-            cellsize=30,
-            verbose='True'
-        )
+        print domain.timestepping_statistics()
 
-    print "# Convert ASCII grid to GeoTiff so geonode can import it"
-    src_ds = gdal.Open('%s/%s.asc' % (outputs_dir, sim_id))
-    dst_filename = ('%s/%s.tif' % (outputs_dir, sim_id))
+    anuga.sww2dem(sim_id + '_momentum.sww',
+                  sim_id + '_momentum.asc',
+                  quantity='momentum',
+                  cellsize=30,
+                  reduction=max,
+                  verbose=True)
+    anuga.sww2dem(sim_id + '_depth.sww',
+                  sim_id + '_depth.asc',
+                  quantity='depth',
+                  cellsize=30,
+                  reduction=max,
+                  verbose=True)
 
-    print "# Create gtif instance"
-    driver = gdal.GetDriverByName("GTiff")
+    outputs =[sim_id + '_momentum', sim_id + '_depth']
 
-    print "# Output to geotiff"
-    dst_ds = driver.CreateCopy(dst_filename, src_ds, 0)
+    for output in outputs:
+        print "# Convert ASCII grid to GeoTiff so geonode can import it"
+        src_ds = gdal.Open('%s/%s.asc' % (outputs_dir, output))
+        dst_filename = ('%s/%s.tif' % (outputs_dir, output))
 
-    print "# Properly close the datasets to flush the disk"
-    dst_filename = None
-    src_ds = None
+        print "# Create gtif instance"
+        driver = gdal.GetDriverByName("GTiff")
+
+        print "# Output to geotiff"
+        dst_ds = driver.CreateCopy(dst_filename, src_ds, 0)
+
+        print "# Properly close the datasets to flush the disk"
+        dst_filename = None
+        src_ds = None
+
     print "Done. Nice work."
 
 if __name__ == "__main__":
