@@ -28,7 +28,7 @@ def run_chennai(sim_id):
         os.makedirs(outputs_dir)
     print "outputs_dir = " + outputs_dir
 
-    get data
+    # get data
     print "downloading data..."
     urllib.urlretrieve(
         'http://chennaifloodmanagement.org/uploaded/layers/_30sdem_utm44.tif',
