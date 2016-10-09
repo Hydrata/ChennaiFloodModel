@@ -37,7 +37,7 @@ def run_chennai(sim_id):
 
     print os.listdir(inputs_dir)
 
-    # configure my logging
+    # configure logging TODO: get this working!
     log_location = project_root + '/' + sim_id + '.log'
     open(log_location, 'a').close()
     log.console_logging_level = log.INFO
@@ -119,7 +119,7 @@ def run_chennai(sim_id):
 
     print "# Evolve system through time"
     counter_timestep = 0
-    for t in domain.evolve(yieldstep=300, finaltime=60000):
+    for t in domain.evolve(yieldstep=300, finaltime=6000):
         counter_timestep += 1
         print counter_timestep
         print domain.timestepping_statistics()
@@ -162,5 +162,6 @@ def run_chennai(sim_id):
     print "Done. Nice work."
 
 if __name__ == "__main__":
+    # TODO: parse argv for local development
     run_chennai('1')
 
